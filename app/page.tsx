@@ -1,103 +1,209 @@
-import Image from "next/image";
+"use client";
+
+import { useMemo, useState } from "react";
+
+type MetricScores = {
+  scalpDensity: number;
+  lighting: number;
+  sharpness: number;
+};
+
+type Analysis = {
+  before: MetricScores;
+  after: MetricScores;
+};
+
+function Progress({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm tabular-nums">{value}%</span>
+      </div>
+      <div className="w-full h-2 bg-black/[.06] dark:bg-white/[.10] rounded">
+        <div
+          className="h-2 bg-foreground rounded"
+          style={{ width: `${Math.max(0, Math.min(100, Math.round(value)))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ImageDrop({
+  label,
+  file,
+  setFile,
+}: {
+  label: string;
+  file: File | null;
+  setFile: (f: File | null) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const previewUrl = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file]
+  );
+
+  return (
+    <label
+      className="flex flex-col items-center justify-center gap-2 border border-dashed border-black/[.15] dark:border-white/[.18] rounded-lg p-6 w-full sm:w-[320px] h-[220px] cursor-pointer hover:bg-black/[.02] dark:hover:bg-white/[.03] transition"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        setDragging(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) setFile(f);
+      }}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+      />
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt={`${label} preview`}
+          className="rounded max-h-[180px] object-contain"
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center text-center text-sm text-black/70 dark:text-white/70">
+          <div className={`text-xs mb-1 ${dragging ? "underline" : ""}`}>
+            Click to upload or drag and drop
+          </div>
+          <div className="font-medium">{label}</div>
+          <div className="text-[11px] opacity-80">PNG, JPG up to ~5MB</div>
+        </div>
+      )}
+    </label>
+  );
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [before, setBefore] = useState<File | null>(null);
+  const [after, setAfter] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Analysis | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const canAnalyze = !!before && !!after && !loading;
+
+  async function startAnalysis() {
+    if (!before || !after) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("before", before);
+      fd.append("after", after);
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Request failed: ${res.status}`);
+      }
+      const data = (await res.json()) as Analysis;
+      setResult(data);
+    } catch (e: any) {
+      setError(e?.message || "Analysis failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function restart() {
+    setBefore(null);
+    setAfter(null);
+    setResult(null);
+    setError(null);
+    setLoading(false);
+  }
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center p-6">
+      <div className="w-full max-w-[900px] flex flex-col gap-6">
+        <h1 className="text-2xl font-semibold">Scalp Comparison</h1>
+
+        <div className="flex flex-col sm:flex-row gap-4">
+          <ImageDrop label="Before photo" file={before} setFile={setBefore} />
+          <ImageDrop label="After photo" file={after} setFile={setAfter} />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="flex gap-3">
+          <button
+            className={`h-10 px-4 rounded bg-foreground text-background disabled:opacity-40 disabled:cursor-not-allowed`}
+            disabled={!canAnalyze}
+            onClick={startAnalysis}
+          >
+            Start analysis
+          </button>
+          <button
+            className="h-10 px-4 rounded border border-black/[.12] dark:border-white/[.16]"
+            onClick={restart}
+          >
+            Restart
+          </button>
+        </div>
+
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-pulse">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                className="border border-black/[.08] dark:border-white/[.12] rounded-lg p-4"
+              >
+                <div className="h-4 w-32 bg-black/[.08] dark:bg-white/[.12] rounded mb-4" />
+                <div className="h-2 w-full bg-black/[.08] dark:bg-white/[.12] rounded mb-2" />
+                <div className="h-2 w-4/5 bg-black/[.08] dark:bg-white/[.12] rounded mb-2" />
+                <div className="h-2 w-3/5 bg-black/[.08] dark:bg-white/[.12] rounded" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && (
+          <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>
+        )}
+
+        {result && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="border border-black/[.08] dark:border-white/[.12] rounded-lg p-4">
+              <div className="font-medium mb-3">Before</div>
+              <div className="flex flex-col gap-3">
+                <Progress
+                  label="Scalp density"
+                  value={result.before.scalpDensity}
+                />
+                <Progress label="Lighting" value={result.before.lighting} />
+                <Progress label="Sharpness" value={result.before.sharpness} />
+              </div>
+            </div>
+            <div className="border border-black/[.08] dark:border-white/[.12] rounded-lg p-4">
+              <div className="font-medium mb-3">After</div>
+              <div className="flex flex-col gap-3">
+                <Progress
+                  label="Scalp density"
+                  value={result.after.scalpDensity}
+                />
+                <Progress label="Lighting" value={result.after.lighting} />
+                <Progress label="Sharpness" value={result.after.sharpness} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
