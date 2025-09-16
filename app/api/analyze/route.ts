@@ -25,7 +25,12 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 function isBlobLike(value: unknown): value is Blob {
-    return !!value && typeof value === "object" && typeof (value as any as Blob).arrayBuffer === "function";
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        "arrayBuffer" in value &&
+        typeof (value as { arrayBuffer: unknown }).arrayBuffer === "function"
+    );
 }
 
 export async function POST(req: NextRequest) {
@@ -41,13 +46,15 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const beforeBlob = before;
+        const afterBlob = after;
         const [beforeB64, afterB64] = await Promise.all([
-            blobToBase64(before),
-            blobToBase64(after),
+            blobToBase64(beforeBlob),
+            blobToBase64(afterBlob),
         ]);
 
-        const beforeType = (before as any).type || "image/jpeg";
-        const afterType = (after as any).type || "image/jpeg";
+        const beforeType = beforeBlob.type || "image/jpeg";
+        const afterType = afterBlob.type || "image/jpeg";
         const beforeUrl = toDataUrl(beforeB64, beforeType);
         const afterUrl = toDataUrl(afterB64, afterType);
 
@@ -98,7 +105,7 @@ All scores must be integers between 0 and 100.`;
         let parsed: AnalysisResponse;
         try {
             parsed = JSON.parse(raw) as AnalysisResponse;
-        } catch (err) {
+        } catch {
             return new Response(
                 JSON.stringify({ error: "Failed to parse model response", raw }),
                 { status: 502, headers: { "Content-Type": "application/json" } }
@@ -128,9 +135,15 @@ All scores must be integers between 0 and 100.`;
             status: 200,
             headers: { "Content-Type": "application/json" },
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : typeof error === "string"
+                    ? error
+                    : "Unexpected error";
         return new Response(
-            JSON.stringify({ error: error?.message || "Unexpected error" }),
+            JSON.stringify({ error: message }),
             { status: 500, headers: { "Content-Type": "application/json" } }
         );
     }

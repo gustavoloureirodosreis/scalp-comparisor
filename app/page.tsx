@@ -72,6 +72,7 @@ function ImageDrop({
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
       {previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={previewUrl}
           alt={`${label} preview`}
@@ -118,8 +119,9 @@ export default function Home() {
       }
       const data = (await res.json()) as Analysis;
       setResult(data);
-    } catch (e: any) {
-      setError(e?.message || "Analysis failed");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Analysis failed";
+      setError(message);
     } finally {
       setLoading(false);
     }
