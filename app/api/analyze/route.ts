@@ -1,22 +1,33 @@
-import OpenAI from "openai";
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-type MetricScores = {
-    scalpDensity: number;
-    lighting: number;
-    sharpness: number;
+type RoboflowPrediction = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    confidence: number;
+    class: string;
+    points?: { x: number; y: number }[];
+};
+
+type ImageResult = {
+    area: number;
+    areaPercentage: number;
+    imageWidth: number;
+    imageHeight: number;
+    confidence: number;
+    detected: boolean;
+    boundingBox?: { x: number; y: number; width: number; height: number };
+    allPolygons?: { x: number; y: number }[][];
+    maskImage?: string;
 };
 
 type AnalysisResponse = {
-    before: MetricScores;
-    after: MetricScores;
+    before: ImageResult;
+    after: ImageResult;
 };
-
-function toDataUrl(base64: string, mimeType: string) {
-    return `data:${mimeType};base64,${base64}`;
-}
 
 async function blobToBase64(blob: Blob): Promise<string> {
     const arrayBuffer = await blob.arrayBuffer();
@@ -33,6 +44,257 @@ function isBlobLike(value: unknown): value is Blob {
     );
 }
 
+// Calculate polygon area using Shoelace formula
+function calculatePolygonArea(points: { x: number; y: number }[]): number {
+    if (!points || points.length < 3) return 0;
+
+    let area = 0;
+    const n = points.length;
+
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area += points[i].x * points[j].y;
+        area -= points[j].x * points[i].y;
+    }
+
+    return Math.abs(area / 2);
+}
+
+async function callRoboflowAPI(
+    base64Image: string,
+    apiKey: string,
+    confidence: number
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+    const response = await fetch(
+        "https://serverless.roboflow.com/gustavos-training-workspace/workflows/nivel-de-cabelo",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                api_key: apiKey,
+                inputs: {
+                    image: { type: "base64", value: base64Image },
+                    confidence,
+                    prompts: "bald spot",
+                },
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Roboflow API error: ${response.status} - ${errorText}`);
+    }
+
+    return response.json();
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractData(result: any): {
+    predictions: RoboflowPrediction[];
+    maskImage?: string;
+    imageWidth: number;
+    imageHeight: number;
+} {
+    let predictions: RoboflowPrediction[] = [];
+    let maskImage: string | undefined;
+    let imageWidth = 0;
+    let imageHeight = 0;
+
+    if (result.outputs && Array.isArray(result.outputs) && result.outputs.length > 0) {
+        const output = result.outputs[0];
+
+        // Extract image dimensions from the response
+        if (output.sam?.image?.width && output.sam?.image?.height) {
+            imageWidth = output.sam.image.width;
+            imageHeight = output.sam.image.height;
+        }
+
+        // Extract mask visualization image if available
+        if (output.mask_visualization) {
+            if (typeof output.mask_visualization === "string") {
+                maskImage = output.mask_visualization;
+            } else if (output.mask_visualization.value) {
+                maskImage = output.mask_visualization.value;
+            }
+        }
+
+        // Try to find predictions in "sam" output
+        if (output.sam) {
+            if (Array.isArray(output.sam)) {
+                predictions = output.sam;
+            } else if (output.sam.predictions) {
+                predictions = output.sam.predictions;
+            }
+        }
+
+        // Fallback: try "predictions" key directly
+        if (predictions.length === 0 && output.predictions) {
+            if (Array.isArray(output.predictions)) {
+                predictions = output.predictions;
+            } else if (output.predictions.predictions) {
+                predictions = output.predictions.predictions;
+            }
+        }
+    } else if (result.predictions) {
+        predictions = result.predictions;
+    }
+
+    // Try to get image dimensions from root level
+    if (imageWidth === 0 && result.image) {
+        imageWidth = result.image.width || 0;
+        imageHeight = result.image.height || 0;
+    }
+
+    // Infer dimensions from predictions if not available
+    if (imageWidth === 0 && predictions.length > 0) {
+        for (const pred of predictions) {
+            if (pred.points) {
+                for (const pt of pred.points) {
+                    imageWidth = Math.max(imageWidth, pt.x);
+                    imageHeight = Math.max(imageHeight, pt.y);
+                }
+            } else if (pred.x && pred.width) {
+                imageWidth = Math.max(imageWidth, pred.x + pred.width / 2);
+                imageHeight = Math.max(imageHeight, pred.y + pred.height / 2);
+            }
+        }
+        // Add some buffer since we're inferring from detection coordinates
+        imageWidth = Math.ceil(imageWidth * 1.1);
+        imageHeight = Math.ceil(imageHeight * 1.1);
+    }
+
+    return { predictions, maskImage, imageWidth, imageHeight };
+}
+
+async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResult> {
+    const apiKey = process.env.ROBOFLOW_API_KEY;
+    if (!apiKey) {
+        throw new Error("Missing ROBOFLOW_API_KEY");
+    }
+
+    let confidence = 0.5;
+    let descents = 0;
+    let predictions: RoboflowPrediction[] = [];
+    let maskImage: string | undefined;
+    let imageWidth = 0;
+    let imageHeight = 0;
+
+    // Retry with descending confidence until we find results
+    while (confidence >= 0.1) {
+        const result = await callRoboflowAPI(base64Image, apiKey, confidence);
+        const extracted = extractData(result);
+        predictions = extracted.predictions;
+        maskImage = extracted.maskImage;
+        imageWidth = extracted.imageWidth;
+        imageHeight = extracted.imageHeight;
+
+        if (predictions.length > 0) {
+            if (descents > 0) {
+                console.log(`Found results after ${descents} confidence descent(s) (final confidence: ${confidence.toFixed(1)})`);
+            }
+            break;
+        }
+
+        confidence -= 0.1;
+        descents++;
+    }
+
+    if (!predictions || predictions.length === 0) {
+        if (descents > 0) {
+            console.log(`No results found after ${descents} confidence descent(s)`);
+        }
+        return {
+            area: 0,
+            areaPercentage: 0,
+            imageWidth,
+            imageHeight,
+            confidence: 0,
+            detected: false
+        };
+    }
+
+    // Sum up ALL prediction areas (not just the best one)
+    let totalArea = 0;
+    let maxConfidence = 0;
+    const allPolygons: { x: number; y: number }[][] = [];
+    let combinedBoundingBox: { x: number; y: number; width: number; height: number } | undefined;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const prediction of predictions) {
+        // Track max confidence
+        if ((prediction.confidence || 0) > maxConfidence) {
+            maxConfidence = prediction.confidence || 0;
+        }
+
+        // Calculate area for this prediction
+        if (prediction.points && prediction.points.length >= 3) {
+            totalArea += calculatePolygonArea(prediction.points);
+            allPolygons.push(prediction.points);
+
+            // Update bounding box
+            for (const pt of prediction.points) {
+                minX = Math.min(minX, pt.x);
+                minY = Math.min(minY, pt.y);
+                maxX = Math.max(maxX, pt.x);
+                maxY = Math.max(maxY, pt.y);
+            }
+        } else if (prediction.width && prediction.height) {
+            totalArea += prediction.width * prediction.height;
+
+            // Update bounding box from this prediction
+            const left = prediction.x - prediction.width / 2;
+            const top = prediction.y - prediction.height / 2;
+            const right = prediction.x + prediction.width / 2;
+            const bottom = prediction.y + prediction.height / 2;
+            minX = Math.min(minX, left);
+            minY = Math.min(minY, top);
+            maxX = Math.max(maxX, right);
+            maxY = Math.max(maxY, bottom);
+        }
+    }
+
+    if (totalArea === 0) {
+        return {
+            area: 0,
+            areaPercentage: 0,
+            imageWidth,
+            imageHeight,
+            confidence: 0,
+            detected: false
+        };
+    }
+
+    // Create combined bounding box
+    if (minX !== Infinity) {
+        combinedBoundingBox = {
+            x: (minX + maxX) / 2,
+            y: (minY + maxY) / 2,
+            width: maxX - minX,
+            height: maxY - minY,
+        };
+    }
+
+    // Calculate area as percentage of total image area
+    const totalImageArea = imageWidth * imageHeight;
+    const areaPercentage = totalImageArea > 0 ? (totalArea / totalImageArea) * 100 : 0;
+
+    return {
+        area: Math.round(totalArea),
+        areaPercentage: Math.round(areaPercentage * 100) / 100, // 2 decimal places
+        imageWidth,
+        imageHeight,
+        confidence: Math.round(maxConfidence * 100),
+        detected: true,
+        boundingBox: combinedBoundingBox,
+        allPolygons: allPolygons.length > 0 ? allPolygons : undefined,
+        maskImage,
+    };
+}
+
 export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
@@ -46,92 +308,31 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const beforeBlob = before;
-        const afterBlob = after;
-        const [beforeB64, afterB64] = await Promise.all([
-            blobToBase64(beforeBlob),
-            blobToBase64(afterBlob),
-        ]);
-
-        const beforeType = beforeBlob.type || "image/jpeg";
-        const afterType = afterBlob.type || "image/jpeg";
-        const beforeUrl = toDataUrl(beforeB64, beforeType);
-        const afterUrl = toDataUrl(afterB64, afterType);
-
-        const apiKey = process.env.OPENAI_API_KEY;
+        const apiKey = process.env.ROBOFLOW_API_KEY;
         if (!apiKey) {
             return new Response(
-                JSON.stringify({ error: "Missing OPENAI_API_KEY" }),
+                JSON.stringify({ error: "Missing ROBOFLOW_API_KEY" }),
                 { status: 500, headers: { "Content-Type": "application/json" } }
             );
         }
 
-        const model = process.env.OPENAI_MODEL || "gpt-5";
-        const openai = new OpenAI({ apiKey });
+        const [beforeB64, afterB64] = await Promise.all([
+            blobToBase64(before),
+            blobToBase64(after),
+        ]);
 
-        const system =
-            "You are a vision QA tool scoring scalp images. Return STRICT JSON only.";
-        const instructions = `Analyze two scalp photos (before, after) and score each image on three metrics:
-- scalpDensity: 0-100 (more visible follicles/coverage -> higher)
-- lighting: 0-100 (even, sufficient exposure without blown highlights -> higher)
-- sharpness: 0-100 (fine hair/skin detail -> higher)
+        // Analyze both images in parallel
+        const [beforeResult, afterResult] = await Promise.all([
+            analyzeImageWithRoboflow(beforeB64),
+            analyzeImageWithRoboflow(afterB64),
+        ]);
 
-Respond with a JSON object ONLY (no prose) that matches this TypeScript type exactly:
-{
-  "before": { "scalpDensity": number, "lighting": number, "sharpness": number },
-  "after": { "scalpDensity": number, "lighting": number, "sharpness": number }
-}
-
-All scores must be integers between 0 and 100.`;
-
-        const completion = await openai.chat.completions.create({
-            model,
-            temperature: 1,
-            response_format: { type: "json_object" },
-            messages: [
-                { role: "system", content: system },
-                {
-                    role: "user",
-                    content: [
-                        { type: "text", text: instructions },
-                        { type: "image_url", image_url: { url: beforeUrl } },
-                        { type: "image_url", image_url: { url: afterUrl } },
-                    ],
-                },
-            ],
-        });
-
-        const raw = completion.choices?.[0]?.message?.content || "{}";
-        let parsed: AnalysisResponse;
-        try {
-            parsed = JSON.parse(raw) as AnalysisResponse;
-        } catch {
-            return new Response(
-                JSON.stringify({ error: "Failed to parse model response", raw }),
-                { status: 502, headers: { "Content-Type": "application/json" } }
-            );
-        }
-
-        const sanitize = (n: unknown) => {
-            const x = Math.round(Number(n));
-            if (!Number.isFinite(x)) return 0;
-            return Math.max(0, Math.min(100, x));
+        const response: AnalysisResponse = {
+            before: beforeResult,
+            after: afterResult,
         };
 
-        const safe: AnalysisResponse = {
-            before: {
-                scalpDensity: sanitize(parsed?.before?.scalpDensity),
-                lighting: sanitize(parsed?.before?.lighting),
-                sharpness: sanitize(parsed?.before?.sharpness),
-            },
-            after: {
-                scalpDensity: sanitize(parsed?.after?.scalpDensity),
-                lighting: sanitize(parsed?.after?.lighting),
-                sharpness: sanitize(parsed?.after?.sharpness),
-            },
-        };
-
-        return new Response(JSON.stringify(safe), {
+        return new Response(JSON.stringify(response), {
             status: 200,
             headers: { "Content-Type": "application/json" },
         });
@@ -148,5 +349,3 @@ All scores must be integers between 0 and 100.`;
         );
     }
 }
-
-
