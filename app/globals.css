@@ -1,62 +1,51 @@
 @import "tailwindcss";
 
 :root {
-  --background: rgb(252, 222, 100); /* #fcde64 */
-  --foreground: rgb(33, 60, 40); /* #213c28 */
+  /* Softer, pastel-inspired palette based on original request */
+  --background: rgb(253, 246, 216); /* Pastel version of Yellow: #fdf6d8 */
+  --foreground: rgb(54, 79, 63); /* Softer version of Dark Green: #364f3f */
 
-  --card: rgb(33, 60, 40); /* #213c28 */
-  --card-foreground: rgb(232, 219, 187); /* #e8dbbb */
+  --card: rgb(54, 79, 63); /* Softer Dark Green */
+  --card-foreground: rgb(240, 234, 210); /* Pastel Beige: #f0ead2 */
 
-  --popover: rgb(33, 60, 40);
-  --popover-foreground: rgb(232, 219, 187);
+  --popover: rgb(54, 79, 63);
+  --popover-foreground: rgb(240, 234, 210);
 
-  --primary: rgb(252, 222, 100); /* #fcde64 */
-  --primary-foreground: rgb(33, 60, 40);
+  --primary: rgb(244, 211, 94); /* Pastel Gold/Yellow: #f4d35e */
+  --primary-foreground: rgb(54, 79, 63);
 
-  --secondary: rgb(
-    50,
-    80,
-    60
-  ); /* Slightly lighter green for secondary elements */
-  --secondary-foreground: rgb(232, 219, 187);
+  --secondary: rgb(129, 152, 133); /* Sage Green */
+  --secondary-foreground: rgb(240, 234, 210);
 
-  --muted: rgb(50, 80, 60);
-  --muted-foreground: rgb(160, 150, 130); /* Dimmer beige */
+  --muted: rgb(70, 95, 80);
+  --muted-foreground: rgb(180, 185, 170); /* Muted Sage/Grey */
 
-  --accent: rgb(232, 219, 187);
-  --accent-foreground: rgb(33, 60, 40);
+  --accent: rgb(240, 234, 210);
+  --accent-foreground: rgb(54, 79, 63);
 
-  --destructive: rgb(239, 68, 68);
-  --destructive-foreground: rgb(232, 219, 187);
+  --destructive: rgb(231, 111, 81); /* Pastel Red/Terracotta: #e76f51 */
+  --destructive-foreground: rgb(240, 234, 210);
 
-  --border: rgb(232, 219, 187); /* Beige borders */
-  --input: rgb(50, 80, 60);
-  --ring: rgb(252, 222, 100);
+  --border: rgb(164, 172, 134); /* Sage Border: #a4ac86 */
+  --input: rgb(70, 95, 80);
+  --ring: rgb(244, 211, 94);
 
-  --radius: 0px; /* Sharp corners */
+  --radius: 0.5rem; /* Reverted to rounded corners for "softer" feel */
 
-  --font-sans: Geist Mono, ui-monospace, monospace; /* Prefer mono for precise look */
+  --font-sans: Geist Mono, ui-monospace, monospace;
   --font-serif: serif;
   --font-mono: Geist Mono, monospace;
 }
 
 .dark {
-  /* Reusing the same palette for now as the request was specific about the "light mode version" colors,
-     but effectively this palette is a mix. I will apply the same palette to dark mode to maintain consistency
-     with the user's specific color request unless they asked for a separate dark mode.
-     They asked for "a light mode version", so I'll ensure the default :root uses it.
-     I'll map .dark to the same or a slight variation if needed, but the user's request implies a specific theme. */
-  --background: rgb(
-    33,
-    60,
-    40
-  ); /* Inverted for dark mode? User asked for "light mode version". */
-  --foreground: rgb(232, 219, 187);
-  --card: rgb(25, 45, 30);
-  --card-foreground: rgb(232, 219, 187);
-  --primary: rgb(252, 222, 100);
-  --primary-foreground: rgb(33, 60, 40);
-  --border: rgb(50, 80, 60);
+  /* Mapping to same palette to enforce the requested design */
+  --background: rgb(54, 79, 63);
+  --foreground: rgb(240, 234, 210);
+  --card: rgb(45, 65, 50);
+  --card-foreground: rgb(240, 234, 210);
+  --primary: rgb(244, 211, 94);
+  --primary-foreground: rgb(54, 79, 63);
+  --border: rgb(70, 95, 80);
 }
 
 @theme inline {
@@ -80,10 +69,10 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -129,13 +118,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-mono);
-  background-image: linear-gradient(
-      to right,
-      rgba(33, 60, 40, 0.05) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, rgba(33, 60, 40, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
+  /* Softer background pattern */
+  background-image: radial-gradient(rgba(54, 79, 63, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 /* Custom scrollbar */
@@ -146,6 +131,6 @@ body {
   background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--secondary);
+  border-radius: 5px;
 }

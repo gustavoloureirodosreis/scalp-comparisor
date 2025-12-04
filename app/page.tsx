@@ -78,11 +78,11 @@ function ImageWithOverlay({
             ctx.lineTo(polygon[i].x * scaleX, polygon[i].y * scaleY);
           }
           ctx.closePath();
-          ctx.fillStyle = "rgba(252, 222, 100, 0.3)"; // Yellow tint
+          ctx.fillStyle = "rgba(244, 211, 94, 0.3)"; // Pastel yellow tint
           ctx.fill();
-          ctx.strokeStyle = "rgba(252, 222, 100, 1)"; // Yellow outline
+          ctx.strokeStyle = "rgba(244, 211, 94, 0.9)"; // Pastel yellow outline
           ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]); // Dashed line for "precise" look
+          ctx.setLineDash([4, 4]);
           ctx.stroke();
           ctx.setLineDash([]);
         }
@@ -94,7 +94,7 @@ function ImageWithOverlay({
       const w = width * scaleX;
       const h = height * scaleY;
 
-      ctx.strokeStyle = "rgba(252, 222, 100, 1)";
+      ctx.strokeStyle = "rgba(244, 211, 94, 0.9)";
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
       ctx.strokeRect(left, top, w, h);
@@ -103,7 +103,7 @@ function ImageWithOverlay({
 
   return (
     <div className="flex flex-col gap-2 animate-enter">
-      <div className="flex items-center justify-between border-b border-border pb-1">
+      <div className="flex items-center justify-between border-b border-border/30 pb-1">
         <div className="text-xs uppercase tracking-widest font-bold text-primary">
           [{label}]
         </div>
@@ -111,12 +111,12 @@ function ImageWithOverlay({
           IMG_DATA_00{label === "Before" ? "1" : "2"}
         </div>
       </div>
-      <div className="relative inline-block mx-auto border-2 border-border bg-black/20 p-1">
+      <div className="relative inline-block mx-auto rounded-lg border border-border/50 bg-black/10 p-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={previewUrl}
           alt={`${label} image`}
-          className="grayscale-[20%] contrast-125"
+          className="rounded shadow-sm"
           style={{
             width: imageDimensions?.width || "auto",
             height: imageDimensions?.height || "auto",
@@ -128,17 +128,17 @@ function ImageWithOverlay({
         {result.detected && imageDimensions && (
           <canvas
             ref={canvasRef}
-            className="absolute top-1 left-1 pointer-events-none"
+            className="absolute top-2 left-2 pointer-events-none rounded"
             style={{
               width: imageDimensions.width,
               height: imageDimensions.height,
             }}
           />
         )}
-        {/* Crosshair overlay */}
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
-          <div className="absolute top-1/2 left-0 w-full h-px bg-white mix-blend-difference"></div>
-          <div className="absolute top-0 left-1/2 w-px h-full bg-white mix-blend-difference"></div>
+        {/* Softer crosshair overlay */}
+        <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-10">
+          <div className="absolute top-1/2 left-0 w-full h-px bg-white mix-blend-overlay"></div>
+          <div className="absolute top-0 left-1/2 w-px h-full bg-white mix-blend-overlay"></div>
         </div>
       </div>
     </div>
@@ -162,20 +162,18 @@ function AreaCard({
       : null;
 
   return (
-    <div className="border-2 border-border bg-card p-4 flex flex-col gap-4 animate-enter relative overflow-hidden group">
-      <div className="absolute top-0 right-0 w-8 h-8 border-l-2 border-b-2 border-border opacity-50"></div>
-
+    <div className="border border-border/50 bg-card/50 backdrop-blur-sm p-5 rounded-xl flex flex-col gap-4 animate-enter relative overflow-hidden group shadow-sm">
       <div className="flex items-center justify-between border-b border-border/20 pb-2">
         <span className="text-xs font-bold uppercase tracking-widest text-primary">
           {label}_ANALYSIS
         </span>
         {result.detected ? (
-          <span className="text-[10px] px-1 border border-primary text-primary uppercase">
-            DETECTED
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/20 text-primary uppercase font-medium">
+            Detected
           </span>
         ) : (
-          <span className="text-[10px] px-1 border border-muted-foreground text-muted-foreground uppercase">
-            NO_SIGNAL
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase font-medium">
+            No Signal
           </span>
         )}
       </div>
@@ -183,7 +181,7 @@ function AreaCard({
       {result.detected ? (
         <>
           <div className="flex flex-col gap-1">
-            <span className="text-5xl font-bold tabular-nums tracking-tighter text-foreground">
+            <span className="text-5xl font-bold tabular-nums tracking-tight text-card-foreground">
               {result.areaPercentage.toFixed(2)}%
             </span>
             <span className="text-xs text-muted-foreground uppercase">
@@ -191,12 +189,12 @@ function AreaCard({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t-2 border-border/20">
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/20">
             <div className="flex flex-col">
               <span className="text-[10px] uppercase text-muted-foreground">
                 Confidence
               </span>
-              <span className="text-lg font-bold tabular-nums">
+              <span className="text-lg font-bold tabular-nums text-card-foreground">
                 {result.confidence}%
               </span>
             </div>
@@ -247,10 +245,10 @@ function ImageDrop({
 
   return (
     <label
-      className={`relative flex flex-col items-center justify-center gap-2 border-2 border-dashed p-6 w-full sm:w-[320px] h-[220px] cursor-pointer transition-all duration-200 animate-enter group ${
+      className={`relative flex flex-col items-center justify-center gap-2 border border-dashed rounded-xl p-6 w-full sm:w-[320px] h-[220px] cursor-pointer transition-all duration-300 animate-enter group ${
         dragging
-          ? "border-primary bg-primary/10"
-          : "border-border hover:border-primary hover:bg-white/5"
+          ? "border-primary bg-primary/10 scale-[1.02]"
+          : "border-border hover:border-primary/50 hover:bg-white/5"
       }`}
       onDragOver={(e) => {
         e.preventDefault();
@@ -267,12 +265,6 @@ function ImageDrop({
         if (f) setFile(f);
       }}
     >
-      {/* Corner markers */}
-      <div className="absolute top-0 left-0 w-2 h-2 border-l-2 border-t-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      <div className="absolute top-0 right-0 w-2 h-2 border-r-2 border-t-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      <div className="absolute bottom-0 left-0 w-2 h-2 border-l-2 border-b-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-      <div className="absolute bottom-0 right-0 w-2 h-2 border-r-2 border-b-2 border-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
       <input
         type="file"
         accept="image/*"
@@ -284,19 +276,19 @@ function ImageDrop({
         <img
           src={previewUrl}
           alt={`${label} preview`}
-          className="max-h-[180px] object-contain border border-border p-1 bg-black/20"
+          className="max-h-[180px] object-contain rounded-lg shadow-sm"
         />
       ) : (
         <div className="flex flex-col items-center justify-center text-center text-sm text-muted-foreground gap-4">
-          <div className="w-12 h-12 border-2 border-current flex items-center justify-center group-hover:scale-110 transition-transform">
-            <span className="text-2xl font-light">+</span>
+          <div className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+            <span className="text-2xl font-light text-primary">+</span>
           </div>
           <div>
-            <div className="font-bold uppercase tracking-widest text-card-foreground">
+            <div className="font-bold uppercase tracking-wider text-card-foreground text-xs mb-1">
               {label}
             </div>
-            <div className="text-[10px] uppercase mt-1 opacity-70">
-              [Drop Zone]
+            <div className="text-[10px] uppercase opacity-60">
+              Click or Drop Image
             </div>
           </div>
         </div>
@@ -361,27 +353,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8">
-      {/* Top decorative ruler */}
-      <div className="w-full max-w-[960px] border-b border-foreground/20 pb-2 flex justify-between text-[10px] font-mono opacity-50">
-        <span>SYS.V.1.0</span>
+      {/* Top decorative ruler - made subtler */}
+      <div className="w-full max-w-[960px] border-b border-foreground/10 pb-2 flex justify-between text-[10px] font-mono opacity-40">
+        <span>SYS.V.1.1</span>
         <span>SCALP_ANALYSIS_MODULE</span>
         <span>{new Date().toISOString().split("T")[0]}</span>
       </div>
 
-      <div className="w-full max-w-[960px] bg-card border-2 border-foreground shadow-[8px_8px_0px_0px_rgba(33,60,40,0.2)] p-8 sm:p-10 flex flex-col gap-8 relative">
-        {/* Decorative corner accents */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-r-2 border-b-2 border-foreground bg-background"></div>
-        <div className="absolute top-0 right-0 w-4 h-4 border-l-2 border-b-2 border-foreground bg-background"></div>
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-r-2 border-t-2 border-foreground bg-background"></div>
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-l-2 border-t-2 border-foreground bg-background"></div>
-
-        <div className="flex flex-col items-center text-center gap-4 border-b-2 border-border pb-8">
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tighter uppercase text-primary">
+      <div className="w-full max-w-[960px] bg-card rounded-2xl shadow-xl p-8 sm:p-10 flex flex-col gap-8 relative overflow-hidden">
+        <div className="flex flex-col items-center text-center gap-4 border-b border-border/20 pb-8">
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight uppercase text-accent">
             Bald Spot Analyzer
           </h1>
-          <div className="h-px w-24 bg-border"></div>
+          <div className="h-px w-16 bg-primary/30"></div>
           <p className="text-sm text-muted-foreground max-w-[500px] leading-relaxed font-mono">
-            // INITIATE COMPARISON SEQUENCE <br />
             Upload visual data points to calculate surface area delta.
           </p>
         </div>
@@ -391,8 +376,8 @@ export default function Home() {
           {!result ? (
             <div className="flex flex-col sm:flex-row gap-6 justify-center w-full">
               <ImageDrop label="Before" file={before} setFile={setBefore} />
-              <div className="hidden sm:flex items-center justify-center">
-                <div className="w-px h-20 bg-border"></div>
+              <div className="hidden sm:flex items-center justify-center opacity-30">
+                <div className="w-px h-12 bg-border"></div>
               </div>
               <ImageDrop label="After" file={after} setFile={setAfter} />
             </div>
@@ -416,16 +401,16 @@ export default function Home() {
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-4 border-t-2 border-border pt-8">
+        <div className="flex items-center justify-center gap-4 border-t border-border/20 pt-8">
           <button
-            className="h-12 px-8 border-2 border-border bg-transparent text-card-foreground font-bold uppercase tracking-wider hover:bg-border/10 transition-colors"
+            className="h-12 px-8 border border-border/30 rounded-lg bg-transparent text-card-foreground/80 font-bold uppercase tracking-wider hover:bg-white/5 transition-colors text-sm"
             onClick={restart}
           >
-            {result ? "Reset_System" : "Clear"}
+            {result ? "Reset" : "Clear"}
           </button>
           {!result && (
             <button
-              className="h-12 px-10 border-2 border-transparent bg-primary text-primary-foreground font-bold uppercase tracking-wider hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]"
+              className="h-12 px-10 rounded-lg bg-primary text-primary-foreground font-bold uppercase tracking-wider hover:bg-primary/90 hover:translate-y-[-1px] active:translate-y-[0px] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20 text-sm"
               disabled={!canAnalyze}
               onClick={startAnalysis}
             >
@@ -435,7 +420,7 @@ export default function Home() {
         </div>
 
         {error && (
-          <div className="text-center p-4 border-2 border-destructive/50 bg-destructive/10 animate-enter">
+          <div className="text-center p-4 border border-destructive/30 rounded-lg bg-destructive/10 animate-enter">
             <span className="text-destructive font-bold uppercase text-sm">
               [Error]: {error}
             </span>
@@ -454,7 +439,7 @@ export default function Home() {
         )}
 
         {percentageChange !== null && (
-          <div className="text-center p-6 border-2 border-border bg-black/10 animate-enter">
+          <div className="text-center p-6 border border-border/30 rounded-xl bg-black/20 animate-enter">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
               /// FINAL_REPORT ///
             </div>
@@ -478,7 +463,7 @@ export default function Home() {
       </div>
 
       <div className="text-[10px] text-foreground/40 font-mono">
-        SYSTEM_READY // WAITING_FOR_INPUT
+        SYSTEM_READY
       </div>
     </div>
   );
