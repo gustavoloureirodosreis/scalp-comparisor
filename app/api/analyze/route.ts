@@ -182,21 +182,39 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
     let maskImage: string | undefined;
     let imageWidth = 0;
     let imageHeight = 0;
+    const className = "bald spot"; // Set your target class here
 
     // Retry with descending confidence until we find results
     while (confidence >= 0.1) {
         const result = await callRoboflowAPI(base64Image, apiKey, confidence);
         const extracted = extractData(result);
-        predictions = extracted.predictions;
-        maskImage = extracted.maskImage;
-        imageWidth = extracted.imageWidth;
-        imageHeight = extracted.imageHeight;
 
-        if (predictions.length > 0) {
+        // Only keep predictions for the target class
+        const filtered = (extracted.predictions || []).filter(
+            (p) => p.class?.toLowerCase() === className.toLowerCase()
+        );
+
+        // Update tracking variables with filtered results if any found, otherwise keep loop variables fresh from latest call
+        // Note: We only break if we find the specific class.
+
+        if (filtered.length > 0) {
+            predictions = filtered;
+            maskImage = extracted.maskImage;
+            imageWidth = extracted.imageWidth;
+            imageHeight = extracted.imageHeight;
+
             if (descents > 0) {
                 console.log(`Found results after ${descents} confidence descent(s) (final confidence: ${confidence.toFixed(1)})`);
             }
             break;
+        }
+
+        // If we didn't find the specific class, we continue descent.
+        // However, we should store the image dimensions from the first valid response if we haven't yet,
+        // just in case we end up with no detections but need to return dimensions.
+        if (imageWidth === 0 && extracted.imageWidth > 0) {
+            imageWidth = extracted.imageWidth;
+            imageHeight = extracted.imageHeight;
         }
 
         confidence -= 0.1;
@@ -205,7 +223,7 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
 
     if (!predictions || predictions.length === 0) {
         if (descents > 0) {
-            console.log(`No results found after ${descents} confidence descent(s)`);
+            console.log(`No results found for class '${className}' after ${descents} confidence descent(s)`);
         }
         return {
             area: 0,
