@@ -363,7 +363,7 @@ export default function Home() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8">
       {/* Top decorative ruler - made subtler */}
       <div className="w-full max-w-[960px] border-b border-foreground/10 pb-2 flex justify-between text-[10px] font-mono opacity-40">
-        <span>SYS.V.1.1</span>
+        <span>SYS.V.1.2</span>
         <span>SCALP_ANALYSIS_MODULE</span>
         <span>{new Date().toISOString().split("T")[0]}</span>
       </div>
