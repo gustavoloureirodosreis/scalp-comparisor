@@ -341,15 +341,23 @@ export default function Home() {
     setLoading(false);
   }
 
-  const percentageChange =
-    result &&
-    result.before.detected &&
-    result.after.detected &&
-    result.before.areaPercentage > 0
-      ? ((result.after.areaPercentage - result.before.areaPercentage) /
+  const percentageChange = useMemo(() => {
+    if (!result || !result.before.detected) return null;
+
+    if (!result.after.detected) {
+      return -100; // Assume 100% reduction if not detected in "after" photo
+    }
+
+    if (result.before.areaPercentage > 0) {
+      return (
+        ((result.after.areaPercentage - result.before.areaPercentage) /
           result.before.areaPercentage) *
         100
-      : null;
+      );
+    }
+
+    return null;
+  }, [result]);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 gap-8">
