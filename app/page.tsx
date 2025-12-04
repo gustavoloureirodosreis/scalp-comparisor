@@ -449,6 +449,7 @@ export default function Home() {
         {percentageChange !== null && (
           <div className="text-center p-6 border border-border/30 rounded-xl bg-black/20 animate-enter">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+              {/* eslint-disable-next-line react/jsx-no-comment-textnodes */}
               /// FINAL_REPORT ///
             </div>
             <div className="text-xl font-bold">
