@@ -428,15 +428,21 @@ export async function POST(req: NextRequest) {
                 ]);
                 completeStep("prepare", start);
 
-                // Step 3: Analyze before image
-                start = startStep("analyze_before");
-                const beforeResult = await analyzeImageWithRoboflow(beforeB64);
-                completeStep("analyze_before", start);
+                // Step 3 & 4: Analyze both images in parallel
+                const analyzeStart = performance.now();
+                updateStep("analyze_before", "running");
+                updateStep("analyze_after", "running");
 
-                // Step 4: Analyze after image
-                start = startStep("analyze_after");
-                const afterResult = await analyzeImageWithRoboflow(afterB64);
-                completeStep("analyze_after", start);
+                const [beforeResult, afterResult] = await Promise.all([
+                    analyzeImageWithRoboflow(beforeB64).then(result => {
+                        completeStep("analyze_before", analyzeStart);
+                        return result;
+                    }),
+                    analyzeImageWithRoboflow(afterB64).then(result => {
+                        completeStep("analyze_after", analyzeStart);
+                        return result;
+                    }),
+                ]);
 
                 // Step 5: Finalize results
                 start = startStep("finalize");
