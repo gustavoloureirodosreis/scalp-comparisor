@@ -2,6 +2,37 @@ import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
+// Step progress types
+type StepStatus = "pending" | "running" | "completed";
+type StepName = "validate" | "prepare" | "analyze_before" | "analyze_after" | "finalize";
+
+type StepProgress = {
+    step: StepName;
+    label: string;
+    status: StepStatus;
+    duration?: number; // ms
+};
+
+type ProgressEvent = {
+    type: "progress";
+    steps: StepProgress[];
+    currentStep: StepName;
+};
+
+type CompleteEvent = {
+    type: "complete";
+    steps: StepProgress[];
+    totalDuration: number;
+    result: AnalysisResponse;
+};
+
+type ErrorEvent = {
+    type: "error";
+    error: string;
+};
+
+type SSEEvent = ProgressEvent | CompleteEvent | ErrorEvent;
+
 type RoboflowPrediction = {
     x: number;
     y: number;
@@ -313,57 +344,136 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
     };
 }
 
+// Helper to create initial steps state
+function createInitialSteps(): StepProgress[] {
+    return [
+        { step: "validate", label: "Validating request", status: "pending" },
+        { step: "prepare", label: "Preparing images", status: "pending" },
+        { step: "analyze_before", label: "Analyzing before image", status: "pending" },
+        { step: "analyze_after", label: "Analyzing after image", status: "pending" },
+        { step: "finalize", label: "Generating results", status: "pending" },
+    ];
+}
+
 export async function POST(req: NextRequest) {
-    try {
-        const formData = await req.formData();
-        const before = formData.get("before");
-        const after = formData.get("after");
+    const encoder = new TextEncoder();
+    const totalStartTime = performance.now();
 
-        if (!isBlobLike(before) || !isBlobLike(after)) {
-            return new Response(
-                JSON.stringify({ error: "Both 'before' and 'after' images are required" }),
-                { status: 400, headers: { "Content-Type": "application/json" } }
-            );
-        }
+    const stream = new ReadableStream({
+        async start(controller) {
+            const steps = createInitialSteps();
+            let stepStartTime = performance.now();
 
-        const apiKey = process.env.ROBOFLOW_API_KEY;
-        if (!apiKey) {
-            return new Response(
-                JSON.stringify({ error: "Missing ROBOFLOW_API_KEY" }),
-                { status: 500, headers: { "Content-Type": "application/json" } }
-            );
-        }
+            // Helper to send SSE event
+            function sendEvent(event: SSEEvent) {
+                const data = `data: ${JSON.stringify(event)}\n\n`;
+                controller.enqueue(encoder.encode(data));
+            }
 
-        const [beforeB64, afterB64] = await Promise.all([
-            blobToBase64(before),
-            blobToBase64(after),
-        ]);
+            // Helper to update step status and send progress
+            function updateStep(stepName: StepName, status: StepStatus, duration?: number) {
+                const step = steps.find(s => s.step === stepName);
+                if (step) {
+                    step.status = status;
+                    if (duration !== undefined) {
+                        step.duration = Math.round(duration);
+                    }
+                }
+                if (status === "running") {
+                    sendEvent({ type: "progress", steps: [...steps], currentStep: stepName });
+                } else if (status === "completed") {
+                    sendEvent({ type: "progress", steps: [...steps], currentStep: stepName });
+                }
+            }
 
-        // Analyze both images in parallel
-        const [beforeResult, afterResult] = await Promise.all([
-            analyzeImageWithRoboflow(beforeB64),
-            analyzeImageWithRoboflow(afterB64),
-        ]);
+            // Helper to start a step and return its start time
+            function startStep(stepName: StepName): number {
+                stepStartTime = performance.now();
+                updateStep(stepName, "running");
+                return stepStartTime;
+            }
 
-        const response: AnalysisResponse = {
-            before: beforeResult,
-            after: afterResult,
-        };
+            // Helper to complete a step
+            function completeStep(stepName: StepName, startTime: number) {
+                const duration = performance.now() - startTime;
+                updateStep(stepName, "completed", duration);
+            }
 
-        return new Response(JSON.stringify(response), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
-    } catch (error: unknown) {
-        const message =
-            error instanceof Error
-                ? error.message
-                : typeof error === "string"
-                    ? error
-                    : "Unexpected error";
-        return new Response(
-            JSON.stringify({ error: message }),
-            { status: 500, headers: { "Content-Type": "application/json" } }
-        );
-    }
+            try {
+                // Step 1: Validate request
+                let start = startStep("validate");
+                const formData = await req.formData();
+                const before = formData.get("before");
+                const after = formData.get("after");
+
+                if (!isBlobLike(before) || !isBlobLike(after)) {
+                    sendEvent({ type: "error", error: "Both 'before' and 'after' images are required" });
+                    controller.close();
+                    return;
+                }
+
+                const apiKey = process.env.ROBOFLOW_API_KEY;
+                if (!apiKey) {
+                    sendEvent({ type: "error", error: "Missing ROBOFLOW_API_KEY" });
+                    controller.close();
+                    return;
+                }
+                completeStep("validate", start);
+
+                // Step 2: Prepare images (convert to base64)
+                start = startStep("prepare");
+                const [beforeB64, afterB64] = await Promise.all([
+                    blobToBase64(before),
+                    blobToBase64(after),
+                ]);
+                completeStep("prepare", start);
+
+                // Step 3: Analyze before image
+                start = startStep("analyze_before");
+                const beforeResult = await analyzeImageWithRoboflow(beforeB64);
+                completeStep("analyze_before", start);
+
+                // Step 4: Analyze after image
+                start = startStep("analyze_after");
+                const afterResult = await analyzeImageWithRoboflow(afterB64);
+                completeStep("analyze_after", start);
+
+                // Step 5: Finalize results
+                start = startStep("finalize");
+                const response: AnalysisResponse = {
+                    before: beforeResult,
+                    after: afterResult,
+                };
+                completeStep("finalize", start);
+
+                // Send complete event with total duration
+                const totalDuration = Math.round(performance.now() - totalStartTime);
+                sendEvent({
+                    type: "complete",
+                    steps: [...steps],
+                    totalDuration,
+                    result: response,
+                });
+
+                controller.close();
+            } catch (error: unknown) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : typeof error === "string"
+                            ? error
+                            : "Unexpected error";
+                sendEvent({ type: "error", error: message });
+                controller.close();
+            }
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    });
 }

@@ -2,6 +2,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+// Progress tracking types
+type StepStatus = "pending" | "running" | "completed";
+type StepName = "validate" | "prepare" | "analyze_before" | "analyze_after" | "finalize";
+
+type StepProgress = {
+  step: StepName;
+  label: string;
+  status: StepStatus;
+  duration?: number;
+};
+
+type ProgressState = {
+  steps: StepProgress[];
+  currentStep: StepName | null;
+  totalDuration: number | null;
+  isComplete: boolean;
+};
+
 type ImageResult = {
   area: number;
   areaPercentage: number;
@@ -297,12 +315,108 @@ function ImageDrop({
   );
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function StepProgressDisplay({ progress }: { progress: ProgressState }) {
+  if (progress.steps.length === 0) return null;
+
+  return (
+    <div className="w-full max-w-md mx-auto animate-enter">
+      <div className="border border-border/30 rounded-xl bg-black/20 backdrop-blur-sm p-4 space-y-3">
+        <div className="flex items-center justify-between border-b border-border/20 pb-2 mb-1">
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Processing
+          </span>
+          {progress.isComplete && progress.totalDuration !== null && (
+            <span className="text-[10px] uppercase tracking-wider text-primary font-medium">
+              Total: {formatDuration(progress.totalDuration)}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          {progress.steps.map((step, index) => (
+            <div
+              key={step.step}
+              className={`flex items-center gap-3 transition-all duration-300 ${
+                step.status === "pending" ? "opacity-40" : "opacity-100"
+              }`}
+              style={{
+                animationDelay: `${index * 50}ms`,
+              }}
+            >
+              {/* Status indicator */}
+              <div className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+                {step.status === "pending" && (
+                  <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                )}
+                {step.status === "running" && (
+                  <div className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                )}
+                {step.status === "completed" && (
+                  <svg
+                    className="w-4 h-4 text-primary"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                )}
+              </div>
+
+              {/* Step label */}
+              <span
+                className={`flex-1 text-xs font-medium ${
+                  step.status === "running"
+                    ? "text-primary"
+                    : step.status === "completed"
+                    ? "text-card-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {step.label}
+              </span>
+
+              {/* Duration */}
+              {step.status === "completed" && step.duration !== undefined && (
+                <span className="text-[10px] tabular-nums text-muted-foreground font-mono">
+                  {formatDuration(step.duration)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const initialProgressState: ProgressState = {
+  steps: [],
+  currentStep: null,
+  totalDuration: null,
+  isComplete: false,
+};
+
 export default function Home() {
   const [before, setBefore] = useState<File | null>(null);
   const [after, setAfter] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Analysis | null>(null);
+  const [progress, setProgress] = useState<ProgressState>(initialProgressState);
+  const [showProgressDetails, setShowProgressDetails] = useState(false);
 
   const canAnalyze = !!before && !!after && !loading;
 
@@ -311,23 +425,71 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setProgress(initialProgressState);
+
     try {
       const fd = new FormData();
       fd.append("before", before);
       fd.append("after", after);
+
       const res = await fetch("/api/analyze", {
         method: "POST",
         body: fd,
       });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || `Request failed: ${res.status}`);
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Request failed: ${res.status}`);
       }
-      const data = (await res.json()) as Analysis;
-      setResult(data);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            try {
+              const event = JSON.parse(jsonStr);
+
+              if (event.type === "progress") {
+                setProgress({
+                  steps: event.steps,
+                  currentStep: event.currentStep,
+                  totalDuration: null,
+                  isComplete: false,
+                });
+              } else if (event.type === "complete") {
+                setProgress({
+                  steps: event.steps,
+                  currentStep: null,
+                  totalDuration: event.totalDuration,
+                  isComplete: true,
+                });
+                setResult(event.result);
+              } else if (event.type === "error") {
+                throw new Error(event.error);
+              }
+            } catch (parseError) {
+              // Skip invalid JSON
+              if (parseError instanceof Error && parseError.message !== "Unexpected end of JSON input") {
+                throw parseError;
+              }
+            }
+          }
+        }
+      }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Analysis failed";
       setError(message);
+      setProgress(initialProgressState);
     } finally {
       setLoading(false);
     }
@@ -339,6 +501,8 @@ export default function Home() {
     setResult(null);
     setError(null);
     setLoading(false);
+    setProgress(initialProgressState);
+    setShowProgressDetails(false);
   }
 
   const percentageChange = useMemo(() => {
@@ -381,7 +545,9 @@ export default function Home() {
 
         {/* Image upload / results with overlay */}
         <div className="min-h-[300px] flex items-center justify-center">
-          {!result ? (
+          {loading && progress.steps.length > 0 ? (
+            <StepProgressDisplay progress={progress} />
+          ) : !result ? (
             <div className="flex flex-col sm:flex-row gap-6 justify-center w-full">
               <ImageDrop label="Before" file={before} setFile={setBefore} />
               <div className="hidden sm:flex items-center justify-center opacity-30">
@@ -466,6 +632,40 @@ export default function Home() {
                   DELTA: 0.0% (NO_CHANGE)
                 </span>
               )}
+            </div>
+            {progress.totalDuration !== null && (
+              <button
+                onClick={() => setShowProgressDetails(true)}
+                className="text-[10px] uppercase tracking-wider text-muted-foreground mt-3 pt-3 border-t border-border/20 hover:text-primary transition-colors cursor-pointer flex items-center gap-1.5 mx-auto"
+              >
+                <span>Processed in {formatDuration(progress.totalDuration)}</span>
+                <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Progress Details Modal */}
+        {showProgressDetails && progress.isComplete && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+            onClick={() => setShowProgressDetails(false)}
+          >
+            <div
+              className="relative animate-enter"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <StepProgressDisplay progress={progress} />
+              <button
+                onClick={() => setShowProgressDetails(false)}
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-card-foreground hover:bg-card/80 transition-colors"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
         )}
