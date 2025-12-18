@@ -805,24 +805,30 @@ export default function Home() {
           </div>
         )}
 
-        {percentageChange !== null && (
+        {result && (
           <div className="text-center p-6 border border-border/30 rounded-xl bg-black/20 animate-enter">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
               {/* eslint-disable-next-line react/jsx-no-comment-textnodes */}
               <span>/// FINAL_REPORT ///</span>
             </div>
             <div className="text-xl font-bold">
-              {percentageChange < 0 ? (
-                <span className="text-primary">
-                  DELTA: -{Math.abs(percentageChange).toFixed(1)}% (IMPROVEMENT)
-                </span>
-              ) : percentageChange > 0 ? (
-                <span className="text-destructive">
-                  DELTA: +{percentageChange.toFixed(1)}% (REGRESSION)
-                </span>
+              {percentageChange !== null ? (
+                percentageChange < 0 ? (
+                  <span className="text-primary">
+                    DELTA: -{Math.abs(percentageChange).toFixed(1)}% (IMPROVEMENT)
+                  </span>
+                ) : percentageChange > 0 ? (
+                  <span className="text-destructive">
+                    DELTA: +{percentageChange.toFixed(1)}% (REGRESSION)
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    DELTA: 0.0% (NO_CHANGE)
+                  </span>
+                )
               ) : (
                 <span className="text-muted-foreground">
-                  DELTA: 0.0% (NO_CHANGE)
+                  NO_DETECTION
                 </span>
               )}
             </div>
