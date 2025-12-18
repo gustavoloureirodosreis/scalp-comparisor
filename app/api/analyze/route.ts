@@ -2,6 +2,35 @@ import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
+// Model configuration
+export type ModelId = "scalp-density-detector" | "nivel-de-cabelo";
+
+type ModelConfig = {
+    id: ModelId;
+    name: string;
+    type: "detect" | "workflow";
+    url: string;
+    prompt?: string;
+};
+
+export const MODELS: Record<ModelId, ModelConfig> = {
+    "scalp-density-detector": {
+        id: "scalp-density-detector",
+        name: "Scalp Density Detector v4",
+        type: "detect",
+        url: "https://detect.roboflow.com/scalp-density-detector/4",
+    },
+    "nivel-de-cabelo": {
+        id: "nivel-de-cabelo",
+        name: "Nivel de Cabelo (Legacy)",
+        type: "workflow",
+        url: "https://serverless.roboflow.com/gustavos-training-workspace/workflows/nivel-de-cabelo",
+        prompt: "bald spot",
+    },
+};
+
+export const DEFAULT_MODEL: ModelId = "scalp-density-detector";
+
 // Step progress types
 type StepStatus = "pending" | "running" | "completed";
 type StepName = "validate" | "prepare" | "analyze_before" | "analyze_after" | "finalize";
@@ -94,26 +123,37 @@ function calculatePolygonArea(points: { x: number; y: number }[]): number {
 async function callRoboflowAPI(
     base64Image: string,
     apiKey: string,
-    confidence: number
+    confidence: number,
+    model: ModelConfig
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
-    const response = await fetch(
-        "https://serverless.roboflow.com/gustavos-training-workspace/workflows/nivel-de-cabelo",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+    let url: string;
+    let body: string;
+
+    if (model.type === "detect") {
+        // Object detection API
+        url = `${model.url}?api_key=${apiKey}&confidence=${Math.round(confidence * 100)}`;
+        body = base64Image;
+    } else {
+        // Workflow API
+        url = model.url;
+        body = JSON.stringify({
+            api_key: apiKey,
+            inputs: {
+                image: { type: "base64", value: base64Image },
+                confidence,
+                prompts: model.prompt || "bald spot",
             },
-            body: JSON.stringify({
-                api_key: apiKey,
-                inputs: {
-                    image: { type: "base64", value: base64Image },
-                    confidence,
-                    prompts: "bald spot",
-                },
-            }),
-        }
-    );
+        });
+    }
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": model.type === "detect" ? "application/x-www-form-urlencoded" : "application/json",
+        },
+        body,
+    });
 
     if (!response.ok) {
         const errorText = await response.text();
@@ -201,7 +241,7 @@ function extractData(result: any): {
     return { predictions, maskImage, imageWidth, imageHeight };
 }
 
-async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResult> {
+async function analyzeImageWithRoboflow(base64Image: string, model: ModelConfig): Promise<ImageResult> {
     const apiKey = process.env.ROBOFLOW_API_KEY;
     if (!apiKey) {
         throw new Error("Missing ROBOFLOW_API_KEY");
@@ -213,21 +253,22 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
     let maskImage: string | undefined;
     let imageWidth = 0;
     let imageHeight = 0;
-    const className = "bald spot"; // Set your target class here
+    // For detect API, we accept any class; for workflow, filter by prompt
+    const filterByClass = model.type === "workflow";
 
     // Retry with descending confidence until we find results
     while (confidence >= 0.1) {
-        const result = await callRoboflowAPI(base64Image, apiKey, confidence);
+        const result = await callRoboflowAPI(base64Image, apiKey, confidence, model);
         const extracted = extractData(result);
 
-        // Only keep predictions for the target class
-        const filtered = (extracted.predictions || []).filter(
-            (p) => p.class?.toLowerCase() === className.toLowerCase()
-        );
+        // For workflow models, filter by class; for detect models, accept all predictions
+        const filtered = filterByClass
+            ? (extracted.predictions || []).filter(
+                (p) => p.class?.toLowerCase() === (model.prompt || "bald spot").toLowerCase()
+            )
+            : extracted.predictions || [];
 
-        // Update tracking variables with filtered results if any found, otherwise keep loop variables fresh from latest call
-        // Note: We only break if we find the specific class.
-
+        // Update tracking variables with filtered results if any found
         if (filtered.length > 0) {
             predictions = filtered;
             maskImage = extracted.maskImage;
@@ -240,9 +281,7 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
             break;
         }
 
-        // If we didn't find the specific class, we continue descent.
-        // However, we should store the image dimensions from the first valid response if we haven't yet,
-        // just in case we end up with no detections but need to return dimensions.
+        // Store image dimensions from the first valid response
         if (imageWidth === 0 && extracted.imageWidth > 0) {
             imageWidth = extracted.imageWidth;
             imageHeight = extracted.imageHeight;
@@ -254,7 +293,7 @@ async function analyzeImageWithRoboflow(base64Image: string): Promise<ImageResul
 
     if (!predictions || predictions.length === 0) {
         if (descents > 0) {
-            console.log(`No results found for class '${className}' after ${descents} confidence descent(s)`);
+            console.log(`No results found after ${descents} confidence descent(s)`);
         }
         return {
             area: 0,
@@ -405,12 +444,15 @@ export async function POST(req: NextRequest) {
                 const formData = await req.formData();
                 const before = formData.get("before");
                 const after = formData.get("after");
+                const modelId = (formData.get("model") as string) || DEFAULT_MODEL;
 
                 if (!isBlobLike(before) || !isBlobLike(after)) {
                     sendEvent({ type: "error", error: "Both 'before' and 'after' images are required" });
                     controller.close();
                     return;
                 }
+
+                const model = MODELS[modelId as ModelId] || MODELS[DEFAULT_MODEL];
 
                 const apiKey = process.env.ROBOFLOW_API_KEY;
                 if (!apiKey) {
@@ -434,11 +476,11 @@ export async function POST(req: NextRequest) {
                 updateStep("analyze_after", "running");
 
                 const [beforeResult, afterResult] = await Promise.all([
-                    analyzeImageWithRoboflow(beforeB64).then(result => {
+                    analyzeImageWithRoboflow(beforeB64, model).then(result => {
                         completeStep("analyze_before", analyzeStart);
                         return result;
                     }),
-                    analyzeImageWithRoboflow(afterB64).then(result => {
+                    analyzeImageWithRoboflow(afterB64, model).then(result => {
                         completeStep("analyze_after", analyzeStart);
                         return result;
                     }),

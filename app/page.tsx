@@ -1,6 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// Model configuration (matching backend)
+type ModelId = "scalp-density-detector" | "nivel-de-cabelo";
+
+type ModelOption = {
+  id: ModelId;
+  name: string;
+  description: string;
+};
+
+const MODELS: ModelOption[] = [
+  {
+    id: "scalp-density-detector",
+    name: "Scalp Density Detector v4",
+    description: "Latest detection model",
+  },
+  {
+    id: "nivel-de-cabelo",
+    name: "Nivel de Cabelo",
+    description: "Legacy workflow model",
+  },
+];
+
+const DEFAULT_MODEL: ModelId = "scalp-density-detector";
+
+// Konami code sequence
+const KONAMI_CODE = [
+  "ArrowUp",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowLeft",
+  "ArrowRight",
+  "KeyB",
+  "KeyA",
+];
 
 // Progress tracking types
 type StepStatus = "pending" | "running" | "completed";
@@ -414,6 +452,151 @@ const initialProgressState: ProgressState = {
   isComplete: false,
 };
 
+// Custom hook for Konami code detection
+function useKonamiCode(callback: () => void) {
+  const inputRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      inputRef.current.push(e.code);
+      inputRef.current = inputRef.current.slice(-KONAMI_CODE.length);
+
+      if (inputRef.current.join(",") === KONAMI_CODE.join(",")) {
+        callback();
+        inputRef.current = [];
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [callback]);
+}
+
+// Model Switcher Component
+function ModelSwitcher({
+  isOpen,
+  onClose,
+  selectedModel,
+  onSelectModel,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  selectedModel: ModelId;
+  onSelectModel: (id: ModelId) => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Funky animated background */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md">
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-destructive rounded-full blur-[100px] animate-pulse [animation-delay:500ms]" />
+          <div className="absolute top-1/2 left-1/2 w-48 h-48 bg-secondary rounded-full blur-[80px] animate-pulse [animation-delay:1000ms]" />
+        </div>
+      </div>
+
+      {/* Modal content */}
+      <div
+        className="relative z-10 animate-enter"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-card border border-primary/50 rounded-2xl p-6 shadow-2xl shadow-primary/20 max-w-md w-full">
+          {/* Header with glitch effect */}
+          <div className="text-center mb-6">
+            <div className="inline-block relative">
+              <h2 className="text-2xl font-bold text-primary uppercase tracking-widest glitch-text">
+                Secret Lab
+              </h2>
+              <div className="absolute -top-1 left-0 w-full h-full text-destructive/50 uppercase tracking-widest font-bold text-2xl clip-glitch-1 animate-glitch-1">
+                Secret Lab
+              </div>
+              <div className="absolute -top-1 left-0 w-full h-full text-secondary/50 uppercase tracking-widest font-bold text-2xl clip-glitch-2 animate-glitch-2">
+                Secret Lab
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-wider">
+              // KONAMI CODE ACTIVATED //
+            </p>
+          </div>
+
+          {/* Model selection */}
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+              Select Analysis Model
+            </div>
+            {MODELS.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  onSelectModel(model.id);
+                  onClose();
+                }}
+                className={`w-full p-4 rounded-xl border transition-all duration-300 text-left group ${
+                  selectedModel === model.id
+                    ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
+                    : "border-border/30 hover:border-primary/50 hover:bg-white/5"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div
+                      className={`font-bold text-sm ${
+                        selectedModel === model.id
+                          ? "text-primary"
+                          : "text-card-foreground"
+                      }`}
+                    >
+                      {model.name}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-1">
+                      {model.description}
+                    </div>
+                  </div>
+                  {selectedModel === model.id && (
+                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                      <svg
+                        className="w-3 h-3 text-primary-foreground"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Close hint */}
+          <div className="mt-6 text-center">
+            <span className="text-[10px] text-muted-foreground/50 uppercase">
+              Click outside or select model to close
+            </span>
+          </div>
+        </div>
+
+        {/* Decorative corners */}
+        <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-primary" />
+        <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-primary" />
+        <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-primary" />
+        <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-primary" />
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [before, setBefore] = useState<File | null>(null);
   const [after, setAfter] = useState<File | null>(null);
@@ -422,6 +605,15 @@ export default function Home() {
   const [result, setResult] = useState<Analysis | null>(null);
   const [progress, setProgress] = useState<ProgressState>(initialProgressState);
   const [showProgressDetails, setShowProgressDetails] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL);
+  const [showModelSwitcher, setShowModelSwitcher] = useState(false);
+
+  // Konami code activation
+  const handleKonamiCode = useCallback(() => {
+    setShowModelSwitcher(true);
+  }, []);
+
+  useKonamiCode(handleKonamiCode);
 
   const canAnalyze = !!before && !!after && !loading;
 
@@ -436,6 +628,7 @@ export default function Home() {
       const fd = new FormData();
       fd.append("before", before);
       fd.append("after", after);
+      fd.append("model", selectedModel);
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -701,9 +894,22 @@ export default function Home() {
         )}
       </div>
 
-      <div className="text-[10px] text-foreground/40 font-mono">
-        SYSTEM_READY
+      <div className="text-[10px] text-foreground/40 font-mono flex items-center gap-2">
+        <span>SYSTEM_READY</span>
+        {selectedModel !== DEFAULT_MODEL && (
+          <span className="text-primary/60">
+            // MODEL: {MODELS.find((m) => m.id === selectedModel)?.name}
+          </span>
+        )}
       </div>
+
+      {/* Secret Model Switcher */}
+      <ModelSwitcher
+        isOpen={showModelSwitcher}
+        onClose={() => setShowModelSwitcher(false)}
+        selectedModel={selectedModel}
+        onSelectModel={setSelectedModel}
+      />
     </div>
   );
 }

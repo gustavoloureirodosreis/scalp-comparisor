@@ -129,6 +129,55 @@
       opacity: 0.7;
     }
   }
+
+  @keyframes glitch-1 {
+    0%, 100% {
+      clip-path: inset(0 0 95% 0);
+      transform: translate(-2px, -2px);
+    }
+    20% {
+      clip-path: inset(40% 0 30% 0);
+      transform: translate(2px, 2px);
+    }
+    40% {
+      clip-path: inset(70% 0 10% 0);
+      transform: translate(-1px, 1px);
+    }
+    60% {
+      clip-path: inset(20% 0 60% 0);
+      transform: translate(1px, -1px);
+    }
+    80% {
+      clip-path: inset(80% 0 5% 0);
+      transform: translate(-2px, 2px);
+    }
+  }
+
+  @keyframes glitch-2 {
+    0%, 100% {
+      clip-path: inset(95% 0 0 0);
+      transform: translate(2px, 2px);
+    }
+    20% {
+      clip-path: inset(10% 0 70% 0);
+      transform: translate(-2px, -2px);
+    }
+    40% {
+      clip-path: inset(50% 0 30% 0);
+      transform: translate(1px, -1px);
+    }
+    60% {
+      clip-path: inset(5% 0 80% 0);
+      transform: translate(-1px, 1px);
+    }
+    80% {
+      clip-path: inset(30% 0 50% 0);
+      transform: translate(2px, -2px);
+    }
+  }
+
+  --animate-glitch-1: glitch-1 0.3s infinite linear;
+  --animate-glitch-2: glitch-2 0.3s infinite linear;
 }
 
 body {
@@ -150,4 +199,21 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--secondary);
   border-radius: 5px;
+}
+
+/* Glitch effect classes */
+.animate-glitch-1 {
+  animation: glitch-1 0.3s infinite linear;
+}
+
+.animate-glitch-2 {
+  animation: glitch-2 0.3s infinite linear;
+}
+
+.clip-glitch-1 {
+  clip-path: inset(0 0 95% 0);
+}
+
+.clip-glitch-2 {
+  clip-path: inset(95% 0 0 0);
 }
