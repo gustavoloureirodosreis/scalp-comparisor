@@ -475,11 +475,11 @@ export async function POST(req: NextRequest) {
                 updateStep("analyze_after", "running");
 
                 const [beforeResult, afterResult] = await Promise.all([
-                    analyzeImageWithRoboflow(beforeB64, model).then(result => {
+                    analyzeImageWithRoboflow(beforeB64, model, apiKey).then(result => {
                         completeStep("analyze_before", analyzeStart);
                         return result;
                     }),
-                    analyzeImageWithRoboflow(afterB64, model).then(result => {
+                    analyzeImageWithRoboflow(afterB64, model, apiKey).then(result => {
                         completeStep("analyze_after", analyzeStart);
                         return result;
                     }),
