@@ -427,7 +427,7 @@ export default function TestPage() {
             Batch Model Test
           </h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Testing {TEST_PAIRS.length} image pairs across {MODELS.length}{" "}
+            Will test {TEST_PAIRS.length} image pairs across {MODELS.length}{" "}
             models
           </p>
         </div>
