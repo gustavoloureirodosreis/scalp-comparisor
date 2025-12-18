@@ -5,14 +5,34 @@ import Link from "next/link";
 
 // Test image pairs configuration
 const TEST_PAIRS = [
-  { id: 1, before: "/test-images/before01.jpg", after: "/test-images/after01.jpg" },
-  { id: 2, before: "/test-images/before02.png", after: "/test-images/after02.png" },
-  { id: 3, before: "/test-images/before03.png", after: "/test-images/after03.png" },
-  { id: 4, before: "/test-images/before04.png", after: "/test-images/after04.png" },
+  {
+    id: 1,
+    before: "/test-images/before01.jpg",
+    after: "/test-images/after01.jpg",
+  },
+  {
+    id: 2,
+    before: "/test-images/before02.png",
+    after: "/test-images/after02.png",
+  },
+  {
+    id: 3,
+    before: "/test-images/before03.png",
+    after: "/test-images/after03.png",
+  },
+  {
+    id: 4,
+    before: "/test-images/before04.png",
+    after: "/test-images/after04.png",
+  },
 ];
 
 const MODELS = [
-  { id: "scalp-density-detector", name: "Scalp Density Detector v4", shortName: "SDDv4" },
+  {
+    id: "scalp-density-detector",
+    name: "Scalp Density Detector v4",
+    shortName: "SDDv4",
+  },
   { id: "nivel-de-cabelo", name: "Nivel de Cabelo (Legacy)", shortName: "NdC" },
 ];
 
@@ -153,7 +173,13 @@ function ImageWithOverlay({
   }, [src]);
 
   useEffect(() => {
-    if (!canvasRef.current || !dimensions || !result.detected || !result.allPolygons) return;
+    if (
+      !canvasRef.current ||
+      !dimensions ||
+      !result.detected ||
+      !result.allPolygons
+    )
+      return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -213,7 +239,9 @@ function ImageWithOverlay({
       </div>
       <div className="text-[10px] font-medium tabular-nums">
         {result.detected ? (
-          <span className="text-primary">{result.areaPercentage.toFixed(2)}%</span>
+          <span className="text-primary">
+            {result.areaPercentage.toFixed(2)}%
+          </span>
         ) : (
           <span className="text-muted-foreground">No detection</span>
         )}
@@ -224,7 +252,9 @@ function ImageWithOverlay({
 
 function ResultCard({ result }: { result: TestResult }) {
   const percentageChange =
-    result.before.detected && result.after.detected && result.before.areaPercentage > 0
+    result.before.detected &&
+    result.after.detected &&
+    result.before.areaPercentage > 0
       ? ((result.after.areaPercentage - result.before.areaPercentage) /
           result.before.areaPercentage) *
         100
@@ -248,9 +278,17 @@ function ResultCard({ result }: { result: TestResult }) {
         <div className="space-y-3">
           {/* Images with overlays */}
           <div className="flex items-center justify-center gap-3">
-            <ImageWithOverlay src={result.beforeUrl} result={result.before} label="Before" />
+            <ImageWithOverlay
+              src={result.beforeUrl}
+              result={result.before}
+              label="Before"
+            />
             <div className="text-muted-foreground/40 text-lg">→</div>
-            <ImageWithOverlay src={result.afterUrl} result={result.after} label="After" />
+            <ImageWithOverlay
+              src={result.afterUrl}
+              result={result.after}
+              label="After"
+            />
           </div>
 
           {/* Delta */}
@@ -313,8 +351,22 @@ export default function TestPage() {
             pairId: pair.id,
             modelId: model.id,
             modelName: model.name,
-            before: { area: 0, areaPercentage: 0, imageWidth: 0, imageHeight: 0, confidence: 0, detected: false },
-            after: { area: 0, areaPercentage: 0, imageWidth: 0, imageHeight: 0, confidence: 0, detected: false },
+            before: {
+              area: 0,
+              areaPercentage: 0,
+              imageWidth: 0,
+              imageHeight: 0,
+              confidence: 0,
+              detected: false,
+            },
+            after: {
+              area: 0,
+              areaPercentage: 0,
+              imageWidth: 0,
+              imageHeight: 0,
+              confidence: 0,
+              detected: false,
+            },
             beforeUrl: pair.before,
             afterUrl: pair.after,
             duration: 0,
@@ -347,8 +399,18 @@ export default function TestPage() {
           href="/"
           className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
           Back
         </Link>
@@ -365,7 +427,8 @@ export default function TestPage() {
             Batch Model Test
           </h1>
           <p className="text-xs text-muted-foreground mt-2">
-            Testing {TEST_PAIRS.length} image pairs across {MODELS.length} models
+            Testing {TEST_PAIRS.length} image pairs across {MODELS.length}{" "}
+            models
           </p>
         </div>
 
@@ -392,79 +455,107 @@ export default function TestPage() {
         {/* Results by Model */}
         {results.length > 0 && (
           <div className="space-y-8">
-            {resultsByModel.map(({ model, results: modelResults, totalTime }) => (
-              <div key={model.id} className="space-y-4">
-                {/* Model Header */}
-                <div className="flex items-center justify-between border-b border-border/20 pb-2">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-                      {model.name}
-                    </h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      {modelResults.length} / {TEST_PAIRS.length} tests
-                    </span>
+            {resultsByModel.map(
+              ({ model, results: modelResults, totalTime }) => (
+                <div key={model.id} className="space-y-4">
+                  {/* Model Header */}
+                  <div className="flex items-center justify-between border-b border-border/20 pb-2">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
+                        {model.name}
+                      </h2>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {modelResults.length} / {TEST_PAIRS.length} tests
+                      </span>
+                    </div>
+                    {modelResults.length > 0 && (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        Total: {formatDuration(totalTime)}
+                      </span>
+                    )}
                   </div>
-                  {modelResults.length > 0 && (
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      Total: {formatDuration(totalTime)}
-                    </span>
-                  )}
-                </div>
 
-                {/* Results Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {modelResults.map((result, idx) => (
-                    <ResultCard key={`${result.modelId}-${result.pairId}-${idx}`} result={result} />
-                  ))}
+                  {/* Results Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {modelResults.map((result, idx) => (
+                      <ResultCard
+                        key={`${result.modelId}-${result.pairId}-${idx}`}
+                        result={result}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         )}
 
         {/* Model Comparison Summary */}
-        {status === "complete" && resultsByModel.every((m) => m.results.length === TEST_PAIRS.length) && (
-          <div className="border border-primary/30 rounded-xl bg-primary/5 p-6 animate-enter">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-4 text-center">
-              /// MODEL COMPARISON ///
-            </div>
-            <div className="grid grid-cols-2 gap-6">
-              {resultsByModel.map(({ model, totalTime }) => (
-                <div key={model.id} className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">{model.name}</div>
-                  <div className="text-2xl font-bold text-primary tabular-nums">
-                    {formatDuration(totalTime)}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {resultsByModel.length === 2 && (
-              <div className="text-center mt-4 pt-4 border-t border-border/20">
-                <span className="text-xs text-muted-foreground">
-                  {resultsByModel[0].totalTime < resultsByModel[1].totalTime ? (
-                    <>
-                      <span className="text-primary font-bold">{resultsByModel[0].model.shortName}</span>
-                      {" "}was{" "}
-                      <span className="text-primary font-bold">
-                        {((resultsByModel[1].totalTime - resultsByModel[0].totalTime) / resultsByModel[1].totalTime * 100).toFixed(0)}% faster
-                      </span>
-                    </>
-                  ) : resultsByModel[1].totalTime < resultsByModel[0].totalTime ? (
-                    <>
-                      <span className="text-primary font-bold">{resultsByModel[1].model.shortName}</span>
-                      {" "}was{" "}
-                      <span className="text-primary font-bold">
-                        {((resultsByModel[0].totalTime - resultsByModel[1].totalTime) / resultsByModel[0].totalTime * 100).toFixed(0)}% faster
-                      </span>
-                    </>
-                  ) : (
-                    "Both models took the same time"
-                  )}
-                </span>
+        {status === "complete" &&
+          resultsByModel.every(
+            (m) => m.results.length === TEST_PAIRS.length
+          ) && (
+            <div className="border border-primary/30 rounded-xl bg-primary/5 p-6 animate-enter">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-4 text-center">
+                {`/// MODEL COMPARISON ///`}
               </div>
-            )}
-          </div>
-        )}
+              <div className="grid grid-cols-2 gap-6">
+                {resultsByModel.map(({ model, totalTime }) => (
+                  <div key={model.id} className="text-center">
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {model.name}
+                    </div>
+                    <div className="text-2xl font-bold text-primary tabular-nums">
+                      {formatDuration(totalTime)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {resultsByModel.length === 2 && (
+                <div className="text-center mt-4 pt-4 border-t border-border/20">
+                  <span className="text-xs text-muted-foreground">
+                    {resultsByModel[0].totalTime <
+                    resultsByModel[1].totalTime ? (
+                      <>
+                        <span className="text-primary font-bold">
+                          {resultsByModel[0].model.shortName}
+                        </span>{" "}
+                        was{" "}
+                        <span className="text-primary font-bold">
+                          {(
+                            ((resultsByModel[1].totalTime -
+                              resultsByModel[0].totalTime) /
+                              resultsByModel[1].totalTime) *
+                            100
+                          ).toFixed(0)}
+                          % faster
+                        </span>
+                      </>
+                    ) : resultsByModel[1].totalTime <
+                      resultsByModel[0].totalTime ? (
+                      <>
+                        <span className="text-primary font-bold">
+                          {resultsByModel[1].model.shortName}
+                        </span>{" "}
+                        was{" "}
+                        <span className="text-primary font-bold">
+                          {(
+                            ((resultsByModel[0].totalTime -
+                              resultsByModel[1].totalTime) /
+                              resultsByModel[0].totalTime) *
+                            100
+                          ).toFixed(0)}
+                          % faster
+                        </span>
+                      </>
+                    ) : (
+                      "Both models took the same time"
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
       </div>
 
       {/* Footer */}

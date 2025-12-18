@@ -839,7 +839,8 @@ export default function Home() {
               {percentageChange !== null ? (
                 percentageChange < 0 ? (
                   <span className="text-primary">
-                    DELTA: -{Math.abs(percentageChange).toFixed(1)}% (IMPROVEMENT)
+                    DELTA: -{Math.abs(percentageChange).toFixed(1)}%
+                    (IMPROVEMENT)
                   </span>
                 ) : percentageChange > 0 ? (
                   <span className="text-destructive">
@@ -851,9 +852,7 @@ export default function Home() {
                   </span>
                 )
               ) : (
-                <span className="text-muted-foreground">
-                  NO_DETECTION
-                </span>
+                <span className="text-muted-foreground">NO_DETECTION</span>
               )}
             </div>
             {progress.totalDuration !== null && (
@@ -920,7 +919,7 @@ export default function Home() {
         <span>SYSTEM_READY</span>
         {selectedModel !== DEFAULT_MODEL && (
           <span className="text-primary/60">
-            // MODEL: {MODELS.find((m) => m.id === selectedModel)?.name}
+            {`// MODEL: ${MODELS.find((m) => m.id === selectedModel)?.name}`}
           </span>
         )}
       </div>
