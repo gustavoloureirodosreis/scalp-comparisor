@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 
 // Model configuration (matching backend)
 type ModelId = "scalp-density-detector" | "nivel-de-cabelo";
@@ -570,8 +571,31 @@ function ModelSwitcher({
             ))}
           </div>
 
+          {/* Test Suite Button */}
+          <Link
+            href="/test"
+            className="mt-4 w-full p-3 rounded-xl border border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5 transition-all flex items-center justify-center gap-2 group"
+          >
+            <svg
+              className="w-4 h-4 text-primary/60 group-hover:text-primary transition-colors"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+              />
+            </svg>
+            <span className="text-xs font-medium text-primary/60 group-hover:text-primary uppercase tracking-wider transition-colors">
+              Run Test Suite
+            </span>
+          </Link>
+
           {/* Animated accent line */}
-          <div className="mt-4 h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent rounded-full overflow-hidden">
+          <div className="mt-3 h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent rounded-full overflow-hidden">
             <div className="h-full w-1/3 bg-primary rounded-full animate-pulse" />
           </div>
         </div>
