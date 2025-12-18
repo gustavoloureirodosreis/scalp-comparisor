@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // Progress tracking types
 type StepStatus = "pending" | "running" | "completed";
-type StepName = "validate" | "prepare" | "analyze_before" | "analyze_after" | "finalize";
+type StepName =
+  | "validate"
+  | "prepare"
+  | "analyze_before"
+  | "analyze_after"
+  | "finalize";
 
 type StepProgress = {
   step: StepName;
@@ -479,7 +484,10 @@ export default function Home() {
               }
             } catch (parseError) {
               // Skip invalid JSON
-              if (parseError instanceof Error && parseError.message !== "Unexpected end of JSON input") {
+              if (
+                parseError instanceof Error &&
+                parseError.message !== "Unexpected end of JSON input"
+              ) {
                 throw parseError;
               }
             }
@@ -638,9 +646,21 @@ export default function Home() {
                 onClick={() => setShowProgressDetails(true)}
                 className="text-[10px] uppercase tracking-wider text-muted-foreground mt-3 pt-3 border-t border-border/20 hover:text-primary transition-colors cursor-pointer flex items-center gap-1.5 mx-auto"
               >
-                <span>Processed in {formatDuration(progress.totalDuration)}</span>
-                <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <span>
+                  Processed in {formatDuration(progress.totalDuration)}
+                </span>
+                <svg
+                  className="w-3 h-3 opacity-60"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
               </button>
             )}
@@ -662,8 +682,18 @@ export default function Home() {
                 onClick={() => setShowProgressDetails(false)}
                 className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-card border border-border/50 flex items-center justify-center text-muted-foreground hover:text-card-foreground hover:bg-card/80 transition-colors"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
