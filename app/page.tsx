@@ -472,7 +472,7 @@ function useKonamiCode(callback: () => void) {
   }, [callback]);
 }
 
-// Model Switcher Component
+// Model Switcher Component - Persistent floating panel
 function ModelSwitcher({
   isOpen,
   onClose,
@@ -487,65 +487,73 @@ function ModelSwitcher({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      {/* Funky animated background */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md">
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary rounded-full blur-[100px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-destructive rounded-full blur-[100px] animate-pulse [animation-delay:500ms]" />
-          <div className="absolute top-1/2 left-1/2 w-48 h-48 bg-secondary rounded-full blur-[80px] animate-pulse [animation-delay:1000ms]" />
-        </div>
-      </div>
-
-      {/* Modal content */}
-      <div
-        className="relative z-10 animate-enter"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bg-card border border-primary/50 rounded-2xl p-6 shadow-2xl shadow-primary/20 max-w-md w-full">
-          {/* Header with glitch effect */}
-          <div className="text-center mb-6">
-            <div className="inline-block relative">
-              <h2 className="text-2xl font-bold text-primary uppercase tracking-widest glitch-text">
-                Secret Lab
-              </h2>
-              <div className="absolute -top-1 left-0 w-full h-full text-destructive/50 uppercase tracking-widest font-bold text-2xl clip-glitch-1 animate-glitch-1">
-                Secret Lab
+    <div className="fixed bottom-6 right-6 z-50 animate-enter">
+      {/* Floating panel */}
+      <div className="relative">
+        <div className="bg-card/95 backdrop-blur-md border border-primary/50 rounded-2xl p-4 shadow-2xl shadow-primary/20 w-72">
+          {/* Header with close button */}
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/30">
+            <div>
+              <div className="relative inline-block">
+                <h3 className="text-sm font-bold text-primary uppercase tracking-widest">
+                  Secret Lab
+                </h3>
+                <div className="absolute -top-0.5 left-0 w-full h-full text-destructive/30 uppercase tracking-widest font-bold text-sm clip-glitch-1 animate-glitch-1">
+                  Secret Lab
+                </div>
               </div>
-              <div className="absolute -top-1 left-0 w-full h-full text-secondary/50 uppercase tracking-widest font-bold text-2xl clip-glitch-2 animate-glitch-2">
-                Secret Lab
-              </div>
+              <p className="text-[8px] text-muted-foreground uppercase tracking-wider mt-0.5">
+                Model Switcher
+              </p>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2 uppercase tracking-wider">
-              // KONAMI CODE ACTIVATED //
-            </p>
+            <button
+              onClick={onClose}
+              className="w-6 h-6 rounded-full bg-black/20 border border-border/30 flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/50 hover:bg-destructive/10 transition-all"
+            >
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
 
           {/* Model selection */}
-          <div className="space-y-3">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
-              Select Analysis Model
-            </div>
+          <div className="space-y-2">
             {MODELS.map((model) => (
               <button
                 key={model.id}
-                onClick={() => {
-                  onSelectModel(model.id);
-                  onClose();
-                }}
-                className={`w-full p-4 rounded-xl border transition-all duration-300 text-left group ${
+                onClick={() => onSelectModel(model.id)}
+                className={`w-full p-3 rounded-xl border transition-all duration-200 text-left ${
                   selectedModel === model.id
-                    ? "border-primary bg-primary/10 shadow-lg shadow-primary/10"
-                    : "border-border/30 hover:border-primary/50 hover:bg-white/5"
+                    ? "border-primary bg-primary/10 shadow-md shadow-primary/10"
+                    : "border-border/20 hover:border-primary/40 hover:bg-white/5"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center gap-3">
+                  {/* Radio indicator */}
+                  <div
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedModel === model.id
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground/30"
+                    }`}
+                  >
+                    {selectedModel === model.id && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
                     <div
-                      className={`font-bold text-sm ${
+                      className={`font-medium text-xs truncate ${
                         selectedModel === model.id
                           ? "text-primary"
                           : "text-card-foreground"
@@ -553,45 +561,29 @@ function ModelSwitcher({
                     >
                       {model.name}
                     </div>
-                    <div className="text-[10px] text-muted-foreground mt-1">
+                    <div className="text-[9px] text-muted-foreground truncate">
                       {model.description}
                     </div>
                   </div>
-                  {selectedModel === model.id && (
-                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                      <svg
-                        className="w-3 h-3 text-primary-foreground"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </div>
-                  )}
                 </div>
               </button>
             ))}
           </div>
 
-          {/* Close hint */}
-          <div className="mt-6 text-center">
-            <span className="text-[10px] text-muted-foreground/50 uppercase">
-              Click outside or select model to close
-            </span>
+          {/* Animated accent line */}
+          <div className="mt-4 h-0.5 bg-gradient-to-r from-transparent via-primary/50 to-transparent rounded-full overflow-hidden">
+            <div className="h-full w-1/3 bg-primary rounded-full animate-pulse" />
           </div>
         </div>
 
         {/* Decorative corners */}
-        <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-primary" />
-        <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-primary" />
-        <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-primary" />
-        <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-primary" />
+        <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-primary/70 rounded-tl" />
+        <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-primary/70 rounded-tr" />
+        <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-primary/70 rounded-bl" />
+        <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-primary/70 rounded-br" />
+
+        {/* Glow effect */}
+        <div className="absolute -inset-4 bg-primary/5 rounded-3xl blur-xl -z-10" />
       </div>
     </div>
   );
