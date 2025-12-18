@@ -11,6 +11,7 @@ type ModelConfig = {
     type: "detect" | "workflow";
     url: string;
     prompt?: string;
+    apiKeyEnv: string;
 };
 
 export const MODELS: Record<ModelId, ModelConfig> = {
@@ -19,6 +20,7 @@ export const MODELS: Record<ModelId, ModelConfig> = {
         name: "Scalp Density Detector v4",
         type: "detect",
         url: "https://detect.roboflow.com/scalp-density-detector/4",
+        apiKeyEnv: "ROBOFLOW_API_KEY_PRO",
     },
     "nivel-de-cabelo": {
         id: "nivel-de-cabelo",
@@ -26,6 +28,7 @@ export const MODELS: Record<ModelId, ModelConfig> = {
         type: "workflow",
         url: "https://serverless.roboflow.com/gustavos-training-workspace/workflows/nivel-de-cabelo",
         prompt: "bald spot",
+        apiKeyEnv: "ROBOFLOW_API_KEY",
     },
 };
 
@@ -241,11 +244,7 @@ function extractData(result: any): {
     return { predictions, maskImage, imageWidth, imageHeight };
 }
 
-async function analyzeImageWithRoboflow(base64Image: string, model: ModelConfig): Promise<ImageResult> {
-    const apiKey = process.env.ROBOFLOW_API_KEY;
-    if (!apiKey) {
-        throw new Error("Missing ROBOFLOW_API_KEY");
-    }
+async function analyzeImageWithRoboflow(base64Image: string, model: ModelConfig, apiKey: string): Promise<ImageResult> {
 
     let confidence = 0.5;
     let descents = 0;
@@ -454,9 +453,9 @@ export async function POST(req: NextRequest) {
 
                 const model = MODELS[modelId as ModelId] || MODELS[DEFAULT_MODEL];
 
-                const apiKey = process.env.ROBOFLOW_API_KEY;
+                const apiKey = process.env[model.apiKeyEnv];
                 if (!apiKey) {
-                    sendEvent({ type: "error", error: "Missing ROBOFLOW_API_KEY" });
+                    sendEvent({ type: "error", error: `Missing ${model.apiKeyEnv}` });
                     controller.close();
                     return;
                 }
