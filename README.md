@@ -32,22 +32,29 @@ Both models stay in the app so they can be compared. The model switcher is hidde
 - **Confidence descent.** If nothing is detected at confidence 0.5, the API retries at 0.4, 0.3 … down to 0.1 and reports the highest detection confidence, so "nothing found" and "found at low confidence" are distinguishable.
 - **Speed.** Before and after images are analysed in parallel. Progress and per-step timings are streamed to the UI with server-sent events.
 
-## Evaluation (v2, zero-shot SAM 3)
+## Evaluation: zero-shot SAM 3 vs. distilled RF-DETR
 
-Run on 2026-10-18 against the four public test pairs in `public/test-images`, through the deployed `/api/analyze` endpoint.
+Run on 2026-10-18 against the four public test pairs in `public/test-images`, through the deployed `/api/analyze` endpoint, twice per model (cold, then warm). Cells show bald-spot area % and the highest detection confidence. Area results were identical across both runs.
 
-| Pair | Server time | Before (area %, conf) | After (area %, conf) |
-|---|---|---|---|
-| 1 | 2.8 s | 4.44 %, 0.67 | 3.79 %, 0.32 |
-| 2 | 4.8 s | not detected | 4.60 %, 0.10 |
-| 3 | 4.4 s | 5.49 %, 0.15 | not detected |
-| 4 | 2.3 s | not detected | not detected |
+| Pair | SAM 3 before | SAM 3 after | RF-DETR before | RF-DETR after |
+|---|---|---|---|---|
+| 1 | 4.44 % (0.67) | 3.79 % (0.32) | 4.84 % (0.85) | 3.59 % (0.90) |
+| 2 | not detected | 4.60 % (0.10) | 9.59 % (0.92) | 3.89 % (0.90) |
+| 3 | 5.49 % (0.15) | not detected | 7.35 % (0.93) | not detected |
+| 4 | not detected | not detected | 3.09 % (0.76) | not detected |
+
+| | SAM 3 (zero-shot) | RF-DETR (distilled) |
+|---|---|---|
+| Bald spot found in "before" photos | 2 of 4 | **4 of 4** |
+| Confidence of detections | 0.10–0.67 | **0.76–0.93** |
+| Server time per pair, warm | 1.6–5.6 s | **0.2–0.5 s** |
 
 What this shows:
 
-- Zero-shot SAM 3 found a bald spot in only **3 of 8 images**, and two of those needed the confidence floor (0.10–0.15).
-- **2.3–4.8 s** per pair, partly because of the confidence-descent retries.
-- With misses this frequent, the "change" number is unreliable. That's the reason for distilling a dedicated model.
+- The distilled model finds the bald spot in every "before" photo with high confidence. Zero-shot SAM 3 misses half of them and often only finds something at the confidence floor.
+- It is roughly **5–10× faster** warm. The first, cold call can still take several seconds, especially when the "after" photo has nothing to detect and the confidence descent retries all the way down to 0.1.
+- On pair 2, SAM 3 reports the "after" as balder than the "before", which is the wrong direction. RF-DETR reports a 59 % reduction.
+- Both models detect nothing in the "after" photos of pairs 3 and 4. That's consistent with a successful treatment, but without ground-truth masks I can't confirm it. That's why a real eval set is on the list below.
 
 ## Known limitations and what I'd do next
 
